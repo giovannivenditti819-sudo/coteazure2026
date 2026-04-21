@@ -1,0 +1,944 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Costa Azzurra 2026 – Road Trip Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <style>
+    :root{
+      --bg:#09111f;
+      --bg2:#0c1729;
+      --panel:rgba(255,255,255,.08);
+      --panel2:rgba(255,255,255,.12);
+      --text:#edf3ff;
+      --muted:#aab7cc;
+      --line:rgba(255,255,255,.08);
+      --cyan:#55d8ff;
+      --pink:#ff4ca1;
+      --gold:#ffd166;
+      --green:#5ce1a3;
+      --danger:#ff7f9f;
+      --shadow:0 18px 48px rgba(0,0,0,.28);
+      --radius:22px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(255,76,161,.18), transparent 28%),
+        radial-gradient(circle at top left, rgba(85,216,255,.14), transparent 30%),
+        linear-gradient(180deg,#08101c 0%,#0b1423 100%);
+    }
+    a{color:var(--cyan)}
+    .container{width:min(1240px, calc(100% - 28px)); margin:0 auto}
+    .topbar{
+      position:sticky; top:0; z-index:30;
+      backdrop-filter:blur(14px);
+      background:rgba(8,16,28,.76);
+      border-bottom:1px solid var(--line);
+      padding:18px 0 16px;
+    }
+    .top-flex{display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap}
+    h1{margin:0; font-size:clamp(30px,4vw,48px); line-height:1; letter-spacing:-.04em}
+    .sub{margin-top:8px; color:var(--muted); font-size:14px}
+    .badges{display:flex; gap:10px; flex-wrap:wrap}
+    .badge{padding:10px 14px; border-radius:999px; background:var(--panel); border:1px solid var(--line); font-size:13px; box-shadow:var(--shadow)}
+    .tabs{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px}
+    .tab{border:0; cursor:pointer; font-weight:800; color:var(--text); background:var(--panel); padding:12px 16px; border-radius:999px}
+    .tab.active,.tab:hover{background:linear-gradient(135deg,var(--cyan),var(--pink)); color:#08101c}
+    main{padding:26px 0 48px}
+    .page{display:none}
+    .page.active{display:block}
+    .grid{display:grid; grid-template-columns:repeat(12,1fr); gap:18px}
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:20px;
+    }
+    .hero{grid-column:span 8; min-height:340px; position:relative; overflow:hidden;
+      background:
+        linear-gradient(135deg, rgba(85,216,255,.18), rgba(255,76,161,.18)),
+        url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80') center/cover;
+    }
+    .hero::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.72))}
+    .hero > *{position:relative; z-index:1}
+    .hero h2{margin:0 0 10px; font-size:clamp(28px,3vw,42px); max-width:760px}
+    .hero p{max-width:780px; line-height:1.58}
+    .stats{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:18px}
+    .stat{padding:14px; border-radius:18px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12)}
+    .stat small{display:block; color:#dce7ff; opacity:.85}
+    .stat strong{display:block; margin-top:6px; font-size:22px}
+    .side{grid-column:span 4; display:grid; gap:18px}
+    .section-head{display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:20px 0 14px}
+    .section-head h2{margin:0; font-size:28px}
+    .muted{color:var(--muted)}
+    .pill{display:inline-block; border-radius:999px; padding:6px 10px; background:rgba(255,255,255,.08); font-size:12px; margin-bottom:10px}
+    .summary-grid{display:grid; grid-template-columns:repeat(12,1fr); gap:18px}
+    .summary-grid .card{grid-column:span 4}
+    .itinerary-list{display:grid; gap:16px}
+    .day-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:24px;
+      padding:18px;
+      display:grid;
+      grid-template-columns:140px 1fr 370px;
+      gap:16px;
+      align-items:start;
+    }
+    .date-box{
+      background:linear-gradient(135deg, rgba(85,216,255,.16), rgba(255,76,161,.16));
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:18px; padding:16px; text-align:center; font-weight:800
+    }
+    .date-box .day-big{font-size:28px; display:block}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+    .chip{background:rgba(255,255,255,.08); border:1px solid var(--line); border-radius:999px; padding:7px 10px; font-size:12px}
+    .editor{
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px;
+    }
+    .editor h4{margin:0 0 12px}
+    .editor-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+    .editor-grid .full{grid-column:1/-1}
+    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+    input[type="number"], input[type="text"], input[type="date"], select, textarea{
+      width:100%; background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--line); border-radius:12px; padding:10px 12px; font:inherit
+    }
+    textarea{min-height:86px; resize:vertical}
+    input[type="range"]{width:100%}
+    .metric{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px;
+      padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.05)
+    }
+    .big-score{font-size:40px; font-weight:800; line-height:1}
+    .score-good{color:var(--green)} .score-mid{color:var(--gold)} .score-low{color:var(--danger)}
+    #map{min-height:680px; border-radius:24px; overflow:hidden; border:1px solid var(--line); box-shadow:var(--shadow)}
+    .legend{display:flex; gap:12px; flex-wrap:wrap; margin-top:14px}
+    .legend-item{display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:999px; background:var(--panel)}
+    .legend-line{width:28px; height:4px; border-radius:999px}
+    .tips-grid,.gallery-grid,.fun-grid,.outfit-grid{display:grid; grid-template-columns:repeat(12,1fr); gap:18px}
+    .tips-grid .card,.fun-grid .card,.outfit-grid .card{grid-column:span 6}
+    .gallery-grid .card{grid-column:span 4; padding:0; overflow:hidden}
+    .gallery-grid img{display:block; width:100%; height:240px; object-fit:cover}
+    .gallery-grid .caption{padding:14px 16px}
+    .table-wrap{overflow:auto; border:1px solid var(--line); border-radius:18px}
+    table{width:100%; min-width:1060px; border-collapse:collapse; background:rgba(255,255,255,.03)}
+    th,td{padding:12px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle}
+    th{background:#10192c; position:sticky; top:0; z-index:1}
+    td[contenteditable="true"]{background:rgba(255,255,255,.04); border-radius:10px; outline:none}
+    td[contenteditable="true"]:focus{background:rgba(85,216,255,.1); box-shadow:inset 0 0 0 1px rgba(85,216,255,.4)}
+    .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+    .btn{border:0; cursor:pointer; font-weight:800; padding:12px 14px; border-radius:14px}
+    .btn.ghost{background:rgba(255,255,255,.08); color:var(--text)}
+    .btn.gold{background:linear-gradient(135deg,var(--gold),#ffa94c); color:#241700}
+    .meter{height:18px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden}
+    .meter > span{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--cyan),var(--pink))}
+    .callout{padding:14px 16px; border-left:4px solid var(--gold); background:rgba(255,209,102,.06); border-radius:12px}
+    .two-col{display:grid; grid-template-columns:1.15fr .85fr; gap:18px}
+    footer{padding:26px 0 50px; text-align:center; color:var(--muted); font-size:13px}
+    @media (max-width:1140px){
+      .hero,.side,.summary-grid .card,.gallery-grid .card,.tips-grid .card,.outfit-grid .card,.fun-grid .card{grid-column:span 12}
+      .day-card{grid-template-columns:1fr}
+    }
+    @media (max-width:680px){
+      .stats,.editor-grid{grid-template-columns:1fr}
+      .two-col{grid-template-columns:1fr}
+      #map{min-height:560px}
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="container">
+    <div class="top-flex">
+      <div>
+        <h1>Costa Azzurra 2026</h1>
+        <div class="sub">Road trip condivisibile e dinamico • partenza da Roma, ma la mappa inizia da Nizza</div>
+      </div>
+      <div class="badges">
+        <div class="badge">🚗 Nizza → Monaco → Cannes → Saint‑Tropez → Nizza</div>
+        <div class="badge">🎲 Casino odds</div>
+        <div class="badge">📊 Budget dinamico</div>
+        <div class="badge">🗺️ Routing su strade vere</div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+  </div>
+</header>
+
+<main class="container">
+  <section class="page active" id="overview">
+    <div class="grid">
+      <div class="card hero">
+        <div class="pill">24–29 luglio 2026 • ricostruito dal file del viaggio</div>
+        <h2>Road trip in Costa Azzurra: mare, scorci assurdi, porti, serate, budget da tenere d’occhio e ritorno costiero fatto bene.</h2>
+        <p>
+          Il piano base segue il file: arrivo da Roma, prima base a Nizza, poi Monaco, Cannes, Saint‑Tropez e rientro a Nizza
+          passando dalla costa senza autostrada. Dentro trovi anche budget giornalieri editabili, check-in/check-out ben visibili,
+          rating delle singole giornate, probabilità “goliardica” di sbancare al casino e un voto generale vacanza che si aggiorna
+          da solo in base a quanto spendete e a quanto vi gasano le tappe.
+        </p>
+        <div class="stats">
+          <div class="stat"><small>Partenza</small><strong>Da Roma</strong></div>
+          <div class="stat"><small>Tappe</small><strong>4 basi + rientro costiero</strong></div>
+          <div class="stat"><small>Spesa base file</small><strong id="baseCostDisplay">$ 1.782</strong></div>
+          <div class="stat"><small>Voto generale vacanza</small><strong id="vacationScoreHero">8.0 / 10</strong></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="card">
+          <h3 style="margin-top:0">Countdown al disastro elegante</h3>
+          <div id="countdown" style="font-size:38px; font-weight:800; line-height:1.1;">...</div>
+          <p class="muted">fino al 24 luglio 2026.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Numeri live</h3>
+          <div class="metric"><span>Budget totale inserito</span><strong id="totalDynamicBudget">€ 0</strong></div>
+          <div class="metric"><span>Rating medio tappe</span><strong id="avgStageRating">7.5 / 10</strong></div>
+          <div class="metric"><span>Probabilità media “sbancare”</span><strong id="avgCasinoOdds">13%</strong></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Indice devasto controllato</h3>
+          <input id="moodSlider" type="range" min="0" max="100" value="78">
+          <div class="meter" style="margin-top:12px"><span id="moodBar"></span></div>
+          <p class="muted" id="moodText" style="margin-top:12px"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Riassunto flash</h2>
+      <span class="muted">Versione rapida da mandare in chat al gruppo</span>
+    </div>
+    <div class="summary-grid">
+      <div class="card"><h3>24 luglio</h3><p>Roma → volo → Nizza, ritiro macchina e serata libera.</p></div>
+      <div class="card"><h3>25 luglio</h3><p>Nizza → Monaco, possibile Èze, casino e serata.</p></div>
+      <div class="card"><h3>26 luglio</h3><p>Monaco → Cannes, possibile Cap d’Antibes.</p></div>
+      <div class="card"><h3>27 luglio</h3><p>Cannes → Saint‑Tropez, mare, aperitivo e fiesta.</p></div>
+      <div class="card"><h3>28 luglio</h3><p>Ritorno costiero vero: Saint‑Tropez → Saint‑Raphaël → Cannes → Antibes → Villefranche → Nizza.</p></div>
+      <div class="card"><h3>29 luglio</h3><p>Nizza → riconsegna macchina → volo ritorno.</p></div>
+    </div>
+
+    <div class="section-head">
+      <h2>Come funziona il punteggio vacanza</h2>
+      <span class="muted">Più spendete bene e più vi piace il giro, più sale</span>
+    </div>
+    <div class="card two-col">
+      <div>
+        <p>
+          Ogni tappa ha prezzi editabili per <strong>cibo</strong>, <strong>alcool</strong>, <strong>serata</strong> e <strong>casino</strong>,
+          più una <strong>valutazione giornata</strong> da 1 a 10. Il sistema pesa:
+        </p>
+        <ul>
+          <li>rating della giornata = molto importante</li>
+          <li>spesa totale = conta, ma non ammazza il voto se vi siete divertiti</li>
+          <li>casino = malus leggero se spinge troppo in alto i costi</li>
+          <li>ritorno costiero e tappe bonus = bonus immersivo</li>
+        </ul>
+        <div class="callout">
+          La “probabilità di sbancare al casino” è volutamente ironica: non è una previsione reale, ma un indicatore per darsi un limite prima di entrare.
+        </div>
+      </div>
+      <div class="card" style="background:rgba(255,255,255,.05); margin:0">
+        <div class="muted">Valutazione generale vacanza</div>
+        <div class="big-score score-good" id="vacationBigScore">8.0</div>
+        <div id="vacationLabel" style="font-weight:800; margin:10px 0 12px;">Molto promettente</div>
+        <div class="meter"><span id="vacationMeter"></span></div>
+        <div class="metric" style="margin-top:14px"><span>Spesa totale dinamica</span><strong id="overallSpend">€ 0</strong></div>
+        <div class="metric"><span>Media rating giornate</span><strong id="overallRating">7.5 / 10</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="itinerary">
+    <div class="section-head">
+      <h2>Itinerario dettagliato</h2>
+      <span class="muted">Check-in, check-out, budget per giornata, rating tappa e prezzi tutti modificabili</span>
+    </div>
+    <div class="itinerary-list" id="itineraryList"></div>
+  </section>
+
+  <section class="page" id="mapPage">
+    <div class="section-head">
+      <h2>Mappa interattiva con strade vere</h2>
+      <span class="muted">Routing OpenStreetMap/OSRM con waypoint costieri per il ritorno panoramico</span>
+    </div>
+    <div id="map"></div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-line" style="background:#55d8ff"></span> Percorso principale</div>
+      <div class="legend-item"><span class="legend-line" style="background:#ffd166"></span> Rientro costiero</div>
+      <div class="legend-item"><span class="legend-line" style="background:#ff4ca1"></span> Tappe bonus / scenic stop</div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h3 style="margin-top:0">Nota pratica</h3>
+      <p class="muted">
+        La mappa usa calcolo percorso online su strade reali. Se aprite il file senza internet, vedrete meno dettagli.
+        Per forzare il ritorno lungo costa invece dell’autostrada, ho inserito waypoint veri lungo il litorale.
+      </p>
+    </div>
+  </section>
+
+  <section class="page" id="tips">
+    <div class="section-head">
+      <h2>Consigli, spiagge, monumenti, bar, club e posti fotogenici</h2>
+      <span class="muted">Con più foto e dritte da usare davvero</span>
+    </div>
+
+    <div class="gallery-grid">
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1505765050516-f72dcac9c60b?auto=format&fit=crop&w=1200&q=80" alt="Nizza sul mare">
+        <div class="caption"><strong>Nizza</strong><div class="muted">Promenade, centro e base perfetta per aprire e chiudere il viaggio.</div></div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=1200&q=80" alt="Monaco">
+        <div class="caption"><strong>Monaco / Monte‑Carlo</strong><div class="muted">Porto, palazzi, casino e vibes da soldi che non sono i vostri.</div></div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?auto=format&fit=crop&w=1200&q=80" alt="Costa Azzurra">
+        <div class="caption"><strong>Riviera coast road</strong><div class="muted">Il ritorno giusto: curve, mare e soste serie, non autostrada e basta.</div></div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=1200&q=80" alt="Cannes">
+        <div class="caption"><strong>Cannes</strong><div class="muted">La Croisette, Le Suquet, porto e serata elegante ma gestibile.</div></div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80" alt="Saint Tropez beach">
+        <div class="caption"><strong>Saint‑Tropez</strong><div class="muted">Spiagge iconiche, aperitivi e potenziale collasso del budget.</div></div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=1200&q=80" alt="Borgo panoramico">
+        <div class="caption"><strong>Èze / stop panoramici</strong><div class="muted">La parte “siamo ancora persone profonde” della vacanza.</div></div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Posti da segnarsi</h2>
+      <span class="muted">Mix utile tra mare, cultura e night</span>
+    </div>
+    <div class="tips-grid">
+      <div class="card">
+        <h3>Monaco</h3>
+        <ul>
+          <li><strong>Casino de Monte‑Carlo</strong> per la sera “vestiti bene e fate i seri”.</li>
+          <li><strong>Monaco‑Ville + Prince’s Palace</strong> per il giro elegante diurno.</li>
+          <li><strong>Oceanographic Museum</strong> se volete una tappa cultura davvero bella.</li>
+          <li><strong>Jimmy’z, Buddha‑Bar, La Rascasse</strong> come nomi serali da tenere.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Cannes</h3>
+        <ul>
+          <li><strong>La Croisette</strong> per lungomare e spiagge.</li>
+          <li><strong>Le Suquet</strong> per centro storico e vista.</li>
+          <li><strong>Vieux Port</strong> bello di sera.</li>
+          <li><strong>Palais des Festivals</strong> per la foto meme.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Saint‑Tropez e dintorni</h3>
+        <ul>
+          <li><strong>Pampelonne Beach</strong> tappa classica.</li>
+          <li><strong>Nikki Beach</strong> se fate beach club fatto bene.</li>
+          <li><strong>Porto + centro storico</strong> per aperitivo e passeggio.</li>
+          <li><strong>Serata con cena in casa almeno una volta</strong>, sennò il budget si imbarbarisce.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Tappe bonus intelligenti</h3>
+        <ul>
+          <li><strong>Èze</strong> vista enorme su Monaco e costa.</li>
+          <li><strong>Cap d’Antibes</strong> deviazione super scenica.</li>
+          <li><strong>Antibes</strong> centro carino e porto.</li>
+          <li><strong>Villefranche‑sur‑Mer</strong> ultimo colpo panoramico prima di Nizza.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Outfit consigliati</h2>
+      <span class="muted">Per evitare di sembrare appena usciti da un autogrill</span>
+    </div>
+    <div class="outfit-grid">
+      <div class="card">
+        <h3>Casino di Monaco</h3>
+        <ul>
+          <li>Camicia/polo pulita, pantalone lungo o chino.</li>
+          <li>Scarpa seria. No ciabatte, no look spiaggia reduce.</li>
+          <li>Giacca leggera utile se volete alzare il livello.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Beach club</h3>
+        <ul>
+          <li>Lino, costume sobrio, occhiali decenti, cambio asciutto.</li>
+          <li>Colori chiari e look curato ma non teatrale.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Tappe diurne e borghi</h3>
+        <ul>
+          <li>Scarpa comoda, crema, cappello se siete lessi dal giorno prima.</li>
+          <li>Per Èze e Cap d’Antibes vince la comodità sulla vanità.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Porti e bar serali</h3>
+        <ul>
+          <li>Polo/camicia semplice, layer leggero per vento serale.</li>
+          <li>Niente look da palestra: siete in Costa Azzurra.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="scoreboard">
+    <div class="section-head">
+      <h2>Classifica partecipanti</h2>
+      <span class="muted">Modificabile e salvata in locale sul browser</span>
+    </div>
+    <div class="card">
+      <p class="muted">
+        Tabella goliardica. Clicca nelle celle, scrivi e il sito salva. L’overall vacanza del singolo si aggiorna in automatico.
+      </p>
+      <div class="table-wrap">
+        <table id="scoreTable">
+          <thead>
+            <tr>
+              <th>Partecipante</th>
+              <th>Soldi spesi (€)</th>
+              <th>Chiavate</th>
+              <th>Pali</th>
+              <th>Voto bevute (1‑10)</th>
+              <th>Voto rotture di cazzi (1‑10)</th>
+              <th>Overall vacanza</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="btns">
+        <button class="btn ghost" onclick="resetScores()">Resetta tabella</button>
+        <button class="btn gold" onclick="exportScores()">Esporta classifica</button>
+      </div>
+      <pre id="exportBox" style="display:none; margin-top:16px; white-space:pre-wrap; background:rgba(255,255,255,.05); border-radius:16px; padding:16px;"></pre>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Creato per il gruppo Costa Azzurra 2026 • HTML singolo apribile dal browser • Roma resta solo come città di partenza
+</footer>
+
+<script>
+const pages = [
+  { id:'overview', label:'Panoramica' },
+  { id:'itinerary', label:'Itinerario' },
+  { id:'mapPage', label:'Mappa' },
+  { id:'tips', label:'Consigli + foto' },
+  { id:'scoreboard', label:'Classifica' }
+];
+
+const itineraryData = [
+  {
+    id:'d24',
+    day:'24',
+    month:'lug',
+    city:'Nizza',
+    title:'Arrivo, ritiro macchina e serata da definire',
+    description:'Partenza da Roma nel pomeriggio, arrivo a Nizza, ritiro auto verso le 18:00 e prima serata libera.',
+    start:'16:00',
+    arrival:'17:20',
+    checkIn:'17:00–23:00',
+    checkOut:'—',
+    notes:'Casa non rimborsabile. Max 11.',
+    baseSpend:725,
+    prices:{ food:40, alcohol:60, night:70, casino:0 },
+    rating:7.4,
+    tags:['Start ufficiale','Ritiro auto','Serata libera']
+  },
+  {
+    id:'d25',
+    day:'25',
+    month:'lug',
+    city:'Monaco',
+    title:'Nizza → Monaco, giro chill + casino',
+    description:'Partenza da Nizza, possibile tappa a Èze, giro a Monaco e serata Monte‑Carlo.',
+    start:'12:00',
+    arrival:'12:30',
+    checkIn:'Dopo le 15:00',
+    checkOut:'12:00 da Nizza',
+    notes:'Parcheggio Grimaldi Forum. Migliori serate annotate: Jimmy’z, Coya, Buddha‑Bar, Twiga, La Rascasse.',
+    baseSpend:275,
+    prices:{ food:55, alcohol:90, night:120, casino:150 },
+    rating:8.8,
+    tags:['30 min in auto','Casino','Monaco by night']
+  },
+  {
+    id:'d26',
+    day:'26',
+    month:'lug',
+    city:'Cannes',
+    title:'Monaco → Cannes passando dove merita',
+    description:'Risveglio post serata, partenza per Cannes, con possibile tappa a Cap d’Antibes.',
+    start:'13:00',
+    arrival:'14:15',
+    checkIn:'16:00–16:30',
+    checkOut:'13:00 da Monaco',
+    notes:'Croisette, Le Suquet o porto. Serata sul porto o lungomare.',
+    baseSpend:183,
+    prices:{ food:50, alcohol:70, night:85, casino:0 },
+    rating:8.1,
+    tags:['La Croisette','Le Suquet','Porto serale']
+  },
+  {
+    id:'d27',
+    day:'27',
+    month:'lug',
+    city:'Saint‑Tropez',
+    title:'Mare, aperitivo e fiesta',
+    description:'Da Cannes a Saint‑Tropez. Giretto sul lungomare, pranzo fuori, aperitivo e poi serata.',
+    start:'13:30',
+    arrival:'15:10',
+    checkIn:'17:00–20:00',
+    checkOut:'13:30 da Cannes',
+    notes:'Pedaggio segnato nel file. Pampelonne e/o Nikki Beach suggeriti.',
+    baseSpend:284,
+    prices:{ food:70, alcohol:110, night:140, casino:0 },
+    rating:8.9,
+    tags:['Pampelonne','Nikki Beach','Fiesta']
+  },
+  {
+    id:'d28',
+    day:'28',
+    month:'lug',
+    city:'Rientro costiero su Nizza',
+    title:'Saint‑Tropez → Nizza senza autostrada',
+    description:'Rientro panoramico lungo costa con soste suggerite: Saint‑Raphaël, Cannes, Antibes, Villefranche.',
+    start:'14:00',
+    arrival:'16:00+',
+    checkIn:'15:00–23:30',
+    checkOut:'14:00 da Saint‑Tropez',
+    notes:'Nel file è scritto chiaramente: NON PRENDERE AUTOSTRADA.',
+    baseSpend:217,
+    prices:{ food:45, alcohol:50, night:60, casino:0 },
+    rating:8.4,
+    tags:['Coast road','Saint‑Raphaël','Antibes','Villefranche']
+  },
+  {
+    id:'d29',
+    day:'29',
+    month:'lug',
+    city:'Nizza',
+    title:'Bagno di coscienza, riconsegna auto e volo',
+    description:'Ultima mattina a Nizza, riconsegna macchina e aereo di ritorno.',
+    start:'14:30',
+    arrival:'17:55',
+    checkIn:'—',
+    checkOut:'Entro la partenza',
+    notes:'Blocco finale del file con volo ritorno, autobus ritorno e benzina.',
+    baseSpend:98,
+    prices:{ food:20, alcohol:10, night:0, casino:0 },
+    rating:6.9,
+    tags:['Riconsegna auto','Volo ritorno','Moral hangover']
+  }
+];
+
+const participants = ['Lorenzo Il Magnifico','YSF','Vitié','Mr. Excel','XVI Re di Roma'];
+const defaultScores = participants.map(name => ({
+  participant:name, money:'', chiavate:'', pali:'', bevute:'', rotture:'', overall:'—', note:''
+}));
+
+function euro(v){ return new Intl.NumberFormat('it-IT',{style:'currency', currency:'EUR', maximumFractionDigits:0}).format(v || 0); }
+
+function setupTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = pages.map((p,i)=>`<button class="tab ${i===0?'active':''}" data-target="${p.id}">${p.label}</button>`).join('');
+  tabs.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.id===btn.dataset.target));
+      if(btn.dataset.target==='mapPage' && window.routeMap){ setTimeout(()=>routeMap.invalidateSize(), 150); }
+    });
+  });
+}
+
+function loadTripState(){
+  const raw = localStorage.getItem('costa_trip_2026_state');
+  if(raw){
+    try{
+      const saved = JSON.parse(raw);
+      return itineraryData.map(day => {
+        const s = saved[day.id] || {};
+        return {
+          ...day,
+          checkIn: s.checkIn ?? day.checkIn,
+          checkOut: s.checkOut ?? day.checkOut,
+          notesExtra: s.notesExtra ?? '',
+          rating: Number(s.rating ?? day.rating),
+          prices: {
+            food: Number(s.food ?? day.prices.food),
+            alcohol: Number(s.alcohol ?? day.prices.alcohol),
+            night: Number(s.night ?? day.prices.night),
+            casino: Number(s.casino ?? day.prices.casino)
+          }
+        };
+      });
+    }catch(e){}
+  }
+  return itineraryData.map(day => ({...day, notesExtra:''}));
+}
+
+let tripState = loadTripState();
+
+function saveTripState(){
+  const state = {};
+  tripState.forEach(day=>{
+    state[day.id] = {
+      checkIn: day.checkIn,
+      checkOut: day.checkOut,
+      notesExtra: day.notesExtra,
+      rating: day.rating,
+      food: day.prices.food,
+      alcohol: day.prices.alcohol,
+      night: day.prices.night,
+      casino: day.prices.casino
+    };
+  });
+  localStorage.setItem('costa_trip_2026_state', JSON.stringify(state));
+}
+
+function totalDayBudget(day){
+  return Number(day.prices.food||0)+Number(day.prices.alcohol||0)+Number(day.prices.night||0)+Number(day.prices.casino||0);
+}
+
+function casinoOdds(day){
+  const bankroll = Number(day.prices.casino||0);
+  if(bankroll <= 0) return 0;
+  const ratingBoost = (Number(day.rating||0)-5) * 0.7;
+  let pct = 4 + Math.min(bankroll/20, 16) + ratingBoost;
+  pct = Math.max(1, Math.min(26, pct));
+  return Math.round(pct);
+}
+
+function renderItinerary(){
+  const wrap = document.getElementById('itineraryList');
+  wrap.innerHTML = tripState.map(day=>{
+    const budget = totalDayBudget(day);
+    const odds = casinoOdds(day);
+    return `
+      <article class="day-card">
+        <div class="date-box">
+          <span class="day-big">${day.day}</span>
+          ${day.month}
+          <div style="margin-top:8px; font-size:12px; color:#dbe7ff">${day.city}</div>
+        </div>
+
+        <div>
+          <div class="pill">${day.city}</div>
+          <h3 style="margin:0 0 8px">${day.title}</h3>
+          <p style="margin:0 0 12px">${day.description}</p>
+          <div class="chips">
+            <span class="chip">⏰ Partenza ${day.start}</span>
+            <span class="chip">📍 Arrivo ${day.arrival}</span>
+            <span class="chip">🟢 Check-in ${day.checkIn}</span>
+            <span class="chip">🔴 Check-out ${day.checkOut}</span>
+            <span class="chip">💵 Base file ${euro(day.baseSpend)}</span>
+            <span class="chip">📦 Budget giornata ${euro(budget)}</span>
+            <span class="chip">🎲 Sbancare al casino: ${odds}%</span>
+            <span class="chip">⭐ Voto tappa ${Number(day.rating).toFixed(1)}/10</span>
+          </div>
+          <p class="muted" style="margin-top:12px">${day.notes}</p>
+          ${day.notesExtra ? `<div class="callout" style="margin-top:12px"><strong>Note extra gruppo:</strong> ${day.notesExtra}</div>` : ''}
+          <div class="chips">
+            ${day.tags.map(tag=>`<span class="chip">${tag}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="editor">
+          <h4>Editor giornata</h4>
+          <div class="editor-grid">
+            <div>
+              <label>Check-in</label>
+              <input type="text" value="${day.checkIn}" data-kind="checkIn" data-id="${day.id}">
+            </div>
+            <div>
+              <label>Check-out</label>
+              <input type="text" value="${day.checkOut}" data-kind="checkOut" data-id="${day.id}">
+            </div>
+            <div>
+              <label>Budget cibo (€)</label>
+              <input type="number" min="0" step="1" value="${day.prices.food}" data-kind="food" data-id="${day.id}">
+            </div>
+            <div>
+              <label>Budget alcool (€)</label>
+              <input type="number" min="0" step="1" value="${day.prices.alcohol}" data-kind="alcohol" data-id="${day.id}">
+            </div>
+            <div>
+              <label>Budget serata (€)</label>
+              <input type="number" min="0" step="1" value="${day.prices.night}" data-kind="night" data-id="${day.id}">
+            </div>
+            <div>
+              <label>Budget casino (€)</label>
+              <input type="number" min="0" step="1" value="${day.prices.casino}" data-kind="casino" data-id="${day.id}">
+            </div>
+            <div class="full">
+              <label>Valutazione generale giornata / tappa (${Number(day.rating).toFixed(1)}/10)</label>
+              <input type="range" min="1" max="10" step="0.1" value="${day.rating}" data-kind="rating" data-id="${day.id}">
+            </div>
+            <div class="full">
+              <label>Note extra</label>
+              <textarea data-kind="notesExtra" data-id="${day.id}" placeholder="Es. prenotare locale, tenere cash, stop consigliato...">${day.notesExtra || ''}</textarea>
+            </div>
+          </div>
+          <div class="metric"><span>Totale dinamico giornata</span><strong>${euro(budget)}</strong></div>
+          <div class="metric"><span>Probabilità “sbancare”</span><strong>${odds}%</strong></div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  wrap.querySelectorAll('input, textarea').forEach(el=>{
+    el.addEventListener('input', event=>{
+      const id = event.target.dataset.id;
+      const kind = event.target.dataset.kind;
+      const day = tripState.find(d=>d.id===id);
+      if(!day) return;
+      if(['checkIn','checkOut','notesExtra'].includes(kind)){
+        day[kind] = event.target.value;
+      } else if(kind === 'rating'){
+        day.rating = Number(event.target.value);
+      } else {
+        day.prices[kind] = Number(event.target.value) || 0;
+      }
+      saveTripState();
+      renderItinerary();
+      updateVacationMetrics();
+    });
+  });
+}
+
+function updateVacationMetrics(){
+  const totalBudget = tripState.reduce((sum,day)=>sum + totalDayBudget(day),0);
+  const avgRating = tripState.reduce((sum,day)=>sum + Number(day.rating||0),0) / tripState.length;
+  const avgOdds = tripState.reduce((sum,day)=>sum + casinoOdds(day),0) / tripState.length;
+  const baseCost = tripState.reduce((sum,day)=>sum + Number(day.baseSpend||0),0);
+  const normalizedSpendPenalty = Math.min(totalBudget / 1400, 2.2);
+  const casinoPenalty = Math.min(tripState.reduce((s,d)=>s + Number(d.prices.casino||0),0) / 700, 1.1);
+  let vacationScore = avgRating + 0.45 - normalizedSpendPenalty - casinoPenalty + 0.35;
+  vacationScore = Math.max(1, Math.min(10, vacationScore));
+
+  const scoreEl = document.getElementById('vacationBigScore');
+  const scoreHero = document.getElementById('vacationScoreHero');
+  const labelEl = document.getElementById('vacationLabel');
+  const meter = document.getElementById('vacationMeter');
+
+  scoreEl.textContent = vacationScore.toFixed(1);
+  scoreHero.textContent = `${vacationScore.toFixed(1)} / 10`;
+  document.getElementById('totalDynamicBudget').textContent = euro(totalBudget);
+  document.getElementById('overallSpend').textContent = euro(totalBudget);
+  document.getElementById('avgStageRating').textContent = `${avgRating.toFixed(1)} / 10`;
+  document.getElementById('overallRating').textContent = `${avgRating.toFixed(1)} / 10`;
+  document.getElementById('avgCasinoOdds').textContent = `${Math.round(avgOdds)}%`;
+  document.getElementById('baseCostDisplay').textContent = '$ ' + new Intl.NumberFormat('it-IT').format(baseCost);
+  meter.style.width = `${vacationScore * 10}%`;
+
+  scoreEl.className = 'big-score ' + (vacationScore >= 7.5 ? 'score-good' : vacationScore >= 5.8 ? 'score-mid' : 'score-low');
+  if(vacationScore >= 8.4) labelEl.textContent = 'Vacanza potenzialmente leggendaria';
+  else if(vacationScore >= 7.3) labelEl.textContent = 'Molto promettente';
+  else if(vacationScore >= 6.1) labelEl.textContent = 'Buona ma da gestire meglio';
+  else if(vacationScore >= 4.8) labelEl.textContent = 'Troppa spesa per il divertimento reso';
+  else labelEl.textContent = 'Ricalibrare rotta, budget e scelte discutibili';
+}
+
+function initMood(){
+  const slider = document.getElementById('moodSlider');
+  const bar = document.getElementById('moodBar');
+  const text = document.getElementById('moodText');
+  function paint(){
+    const v = Number(slider.value);
+    bar.style.width = v + '%';
+    text.textContent =
+      v < 20 ? 'Modalità pellegrinaggio civile.' :
+      v < 40 ? 'Vacanza gestibile, ancora in zona sicurezza.' :
+      v < 65 ? 'Buon equilibrio tra mare, danni e lucidità residua.' :
+      v < 85 ? 'Livello alto: divertimento serio, errori possibili.' :
+      'Zona rossa: meme assicurati, dignità molto meno.';
+  }
+  slider.addEventListener('input', paint);
+  paint();
+}
+
+function startCountdown(){
+  const el = document.getElementById('countdown');
+  const target = new Date('2026-07-24T08:00:00');
+  function tick(){
+    const diff = target - new Date();
+    if(diff <= 0){ el.textContent = 'È il giorno del delirio'; return; }
+    const d = Math.floor(diff/86400000);
+    const h = Math.floor((diff/3600000)%24);
+    const m = Math.floor((diff/60000)%60);
+    el.textContent = `${d}g ${h}h ${m}m`;
+  }
+  tick(); setInterval(tick, 60000);
+}
+
+function initMap(){
+  const scenicStops = [
+    { name:'Èze', coords:[43.7277, 7.3619], color:'#ff4ca1', text:'Belvedere perfetto tra Nizza e Monaco.' },
+    { name:'Cap d’Antibes', coords:[43.5475, 7.1294], color:'#ff4ca1', text:'Deviazione super scenica.' },
+    { name:'Saint‑Raphaël', coords:[43.4233, 6.7684], color:'#ff4ca1', text:'Buona sosta sul ritorno.' },
+    { name:'Antibes', coords:[43.5804, 7.1251], color:'#ff4ca1', text:'Centro e porto sul rientro.' },
+    { name:'Villefranche‑sur‑Mer', coords:[43.7042, 7.3144], color:'#ff4ca1', text:'Ultimo spot top prima di Nizza.' }
+  ];
+
+  window.routeMap = L.map('map').setView([43.57,7.12], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:19,
+    attribution:'&copy; OpenStreetMap contributors'
+  }).addTo(routeMap);
+
+  const mainIcon = L.divIcon({className:'', html:'<div style="background:#55d8ff;color:#08101c;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;border:2px solid white">•</div>', iconSize:[28,28], iconAnchor:[14,14]});
+  [
+    { name:'Nizza', coords:[43.7102, 7.2620], text:'Base iniziale e finale' },
+    { name:'Monaco', coords:[43.7384, 7.4246], text:'Casino + serata' },
+    { name:'Cannes', coords:[43.5528, 7.0174], text:'Croisette + porto' },
+    { name:'Saint‑Tropez', coords:[43.2673, 6.6402], text:'Beach + fiesta' }
+  ].forEach((s,i)=>{
+    L.marker(s.coords, {icon: mainIcon}).addTo(routeMap).bindPopup(`<strong>${i+1}. ${s.name}</strong><br>${s.text}`);
+  });
+
+  scenicStops.forEach(s=>{
+    L.circleMarker(s.coords, {radius:8, color:s.color, fillColor:s.color, fillOpacity:.85, weight:2}).addTo(routeMap).bindPopup(`<strong>${s.name}</strong><br>${s.text}`);
+  });
+
+  const routeStyleMain = [{color:'#55d8ff', weight:6, opacity:.9}];
+  const routeStyleReturn = [{color:'#ffd166', weight:6, opacity:.95}];
+
+  L.Routing.control({
+    waypoints: [
+      L.latLng(43.7102, 7.2620),   // Nice
+      L.latLng(43.7277, 7.3619),   // Eze
+      L.latLng(43.7384, 7.4246),   // Monaco
+      L.latLng(43.5475, 7.1294),   // Cap d'Antibes
+      L.latLng(43.5528, 7.0174),   // Cannes
+      L.latLng(43.2673, 6.6402)    // Saint-Tropez
+    ],
+    lineOptions:{styles:routeStyleMain, addWaypoints:false},
+    show:false,
+    routeWhileDragging:false,
+    fitSelectedRoutes:true,
+    createMarker:()=>null,
+    altLineOptions:{styles:[{opacity:0}]}
+  }).addTo(routeMap);
+
+  L.Routing.control({
+    waypoints: [
+      L.latLng(43.2673, 6.6402),   // Saint-Tropez
+      L.latLng(43.2969, 6.6350),   // Port Grimaud side
+      L.latLng(43.4233, 6.7684),   // Saint-Raphael
+      L.latLng(43.5528, 7.0174),   // Cannes
+      L.latLng(43.5804, 7.1251),   // Antibes
+      L.latLng(43.7042, 7.3144),   // Villefranche
+      L.latLng(43.7102, 7.2620)    // Nice
+    ],
+    lineOptions:{styles:routeStyleReturn, addWaypoints:false},
+    show:false,
+    routeWhileDragging:false,
+    fitSelectedRoutes:false,
+    createMarker:()=>null,
+    altLineOptions:{styles:[{opacity:0}]}
+  }).addTo(routeMap);
+}
+
+function computeOverallRow(row){
+  const money = Number(row.money)||0;
+  const chiavate = Number(row.chiavate)||0;
+  const pali = Number(row.pali)||0;
+  const bevute = Number(row.bevute)||0;
+  const rotture = Number(row.rotture)||0;
+  let score = 5 + bevute*0.45 + chiavate*0.8 - pali*0.35 - rotture*0.55 - Math.min(money/900, 1.8);
+  score = Math.max(1, Math.min(10, score));
+  return score.toFixed(1);
+}
+
+function loadScores(){
+  const raw = localStorage.getItem('costa_azzurra_2026_scores');
+  if(!raw) return structuredClone(defaultScores);
+  try{return JSON.parse(raw);}catch(e){return structuredClone(defaultScores);}
+}
+
+function saveScores(data){
+  localStorage.setItem('costa_azzurra_2026_scores', JSON.stringify(data));
+}
+
+function renderScoreTable(){
+  const tbody = document.querySelector('#scoreTable tbody');
+  const data = loadScores();
+  tbody.innerHTML = data.map((row, index)=>`
+    <tr data-index="${index}">
+      <td>${row.participant}</td>
+      <td contenteditable="true" data-key="money">${row.money}</td>
+      <td contenteditable="true" data-key="chiavate">${row.chiavate}</td>
+      <td contenteditable="true" data-key="pali">${row.pali}</td>
+      <td contenteditable="true" data-key="bevute">${row.bevute}</td>
+      <td contenteditable="true" data-key="rotture">${row.rotture}</td>
+      <td>${computeOverallRow(row)}</td>
+      <td contenteditable="true" data-key="note">${row.note||''}</td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('td[contenteditable="true"]').forEach(cell=>{
+    cell.addEventListener('input', ()=>{
+      const tr = cell.closest('tr');
+      const idx = Number(tr.dataset.index);
+      const key = cell.dataset.key;
+      data[idx][key] = cell.textContent.trim();
+      data[idx].overall = computeOverallRow(data[idx]);
+      saveScores(data);
+      renderScoreTable();
+    });
+  });
+}
+
+function resetScores(){
+  localStorage.removeItem('costa_azzurra_2026_scores');
+  renderScoreTable();
+  document.getElementById('exportBox').style.display='none';
+}
+
+function exportScores(){
+  const data = loadScores();
+  const lines = data.map((r,i)=>`${i+1}. ${r.participant} — €${r.money||0} | chiavate:${r.chiavate||0} | pali:${r.pali||0} | bevute:${r.bevute||0} | rotture:${r.rotture||0} | overall:${computeOverallRow(r)} | note:${r.note||'-'}`);
+  const box = document.getElementById('exportBox');
+  box.style.display='block';
+  box.textContent = 'CLASSIFICA COSTA AZZURRA 2026\n\n' + lines.join('\n');
+}
+
+setupTabs();
+renderItinerary();
+updateVacationMetrics();
+initMood();
+startCountdown();
+renderScoreTable();
+setTimeout(initMap, 120);
+</script>
+</body>
+</html>
